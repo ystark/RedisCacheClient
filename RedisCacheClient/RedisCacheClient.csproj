@@ -39,6 +39,7 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CacheItemWithTTL.cs" />
     <Compile Include="ConnectionExtensions.cs" />
     <Compile Include="RedisCache.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

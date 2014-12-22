@@ -199,7 +199,7 @@ namespace RedisCacheClient
 
             var database = Connection.GetDatabase(_db);
 
-            var value = _deserializer(database.StringGet(key));
+            var value = DeserializeWithTTL(database, key, database.StringGet(key));
 
             database.KeyDelete(key, CommandFlags.FireAndForget);
 
@@ -225,7 +225,7 @@ namespace RedisCacheClient
 
         public override DefaultCacheCapabilities DefaultCacheCapabilities
         {
-            get { return DefaultCacheCapabilities.OutOfProcessProvider | DefaultCacheCapabilities.AbsoluteExpirations; }
+            get { return DefaultCacheCapabilities.OutOfProcessProvider | DefaultCacheCapabilities.AbsoluteExpirations | DefaultCacheCapabilities.SlidingExpirations; }
         }
 
         public override string Name
@@ -290,12 +290,30 @@ namespace RedisCacheClient
             }
 
             var database = Connection.GetDatabase(_db);
-            
+
+            if (policy != null && policy.SlidingExpiration != NoSlidingExpiration)
+            {
+                // save original TTL
+                value = new CacheItemWithTTL { value = value, TTL = policy.SlidingExpiration };
+            }
+
             var result = _deserializer(database.StringGetSet(key, _serializer(value)));
 
-            if (policy != null && policy.AbsoluteExpiration != InfiniteAbsoluteExpiration)
+            if (policy != null)
             {
-                database.KeyExpire(key, policy.AbsoluteExpiration.UtcDateTime, CommandFlags.FireAndForget);
+                if (policy.AbsoluteExpiration != InfiniteAbsoluteExpiration)
+                {
+                    database.KeyExpire(key, policy.AbsoluteExpiration.UtcDateTime, CommandFlags.FireAndForget);
+                }
+                else if (policy.SlidingExpiration != NoSlidingExpiration)
+                {
+                    database.KeyExpire(key, policy.SlidingExpiration, CommandFlags.FireAndForget);                    
+                }
+            }
+
+            if (result is CacheItemWithTTL)
+            {
+                return ((CacheItemWithTTL)result).value;
             }
 
             return result;
@@ -320,7 +338,7 @@ namespace RedisCacheClient
 
             var database = Connection.GetDatabase(_db);
 
-            return _deserializer(database.StringGet(key));
+            return DeserializeWithTTL(database, key, database.StringGet(key));
         }
 
         private IDictionary<string, object> GetInternal(IEnumerable<string> keys, string regionName)
@@ -349,7 +367,20 @@ namespace RedisCacheClient
 
             var values = database.StringGet(keys);
 
-            return Enumerable.Range(0, keys.Length).ToDictionary(p => (string)keys[p], p => _deserializer(values[p]));
+            return Enumerable.Range(0, keys.Length).ToDictionary(p => (string)keys[p], p => DeserializeWithTTL(database, keys[p], values[p]));
+        }
+
+        private object DeserializeWithTTL(IDatabase database, string key, byte[] value)
+        {
+            var result = _deserializer(value);
+            if (result is CacheItemWithTTL)
+            {
+                // extend TTL for items with sliding expiration
+                CacheItemWithTTL res = (CacheItemWithTTL)result;
+                database.KeyExpire(key, res.TTL, CommandFlags.FireAndForget);
+                return res.value;
+            }
+            return result;
         }
 
         private void SetInternal(string key, object value, string regionName, CacheItemPolicy policy)
@@ -379,6 +410,12 @@ namespace RedisCacheClient
             if (policy != null && policy.AbsoluteExpiration != InfiniteAbsoluteExpiration)
             {
                 database.StringSet(key, _serializer(value), policy.AbsoluteExpiration.UtcDateTime - DateTimeOffset.UtcNow);
+            }
+            else if (policy != null && policy.SlidingExpiration != NoSlidingExpiration)
+            {
+                // save original TTL
+                value = new CacheItemWithTTL { value = value, TTL = policy.SlidingExpiration };
+                database.StringSet(key, _serializer(value), policy.SlidingExpiration);
             }
             else
             {
