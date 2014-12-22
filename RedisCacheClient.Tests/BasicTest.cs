@@ -9,11 +9,23 @@ namespace RedisCacheClient.Tests
     [TestClass]
     public class BasicTest
     {
+        private ObjectCache cache;
+
+        [TestInitialize]
+        public void Initialize()
+        {
+            cache = CreateRedisCache();
+        }
+
+        [TestCleanup]
+        public void Cleanup()
+        {
+            DisposeRedisCache(cache);
+        }
+
         [TestMethod]
         public void Add()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var expected = "bar";
 
@@ -27,8 +39,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void AddOrGetExisting()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var expected = "bar";
 
@@ -42,8 +52,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void SetAndAddOrGetExisting()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var expected = "bar";
             var newValue = "baz";
@@ -58,8 +66,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void Contains()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var value = "bar";
 
@@ -73,8 +79,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void SetAndGet()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var expected = "bar";
 
@@ -88,8 +92,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void GetValues()
         {
-            var cache = CreateRedisCache();
-
             var keys = new[] { "foo", "bar", "baz" };
             var expected = new[] { "bar", "baz", "foo" };
 
@@ -106,8 +108,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void Remove()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var value = "bar";
 
@@ -123,8 +123,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void RemoveAndReturn()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var excepted = "bar";
 
@@ -138,8 +136,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void Indexer()
         {
-            var cache = CreateRedisCache();
-
             var key = "foo";
             var expected = "bar";
 
@@ -153,8 +149,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void Empty()
         {
-            var cache = CreateRedisCache();
-
             var key = "foobarbaz";
 
             var actual = cache.Get(key);
@@ -165,8 +159,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void GetCount()
         {
-            var cache = CreateRedisCache();
-
             var expected = 3;
 
             for (int i = 0; i < expected; i++)
@@ -193,6 +185,14 @@ namespace RedisCacheClient.Tests
             }
 
             return cache;
+        }
+
+        private void DisposeRedisCache(ObjectCache cache)
+        {
+            if (cache is RedisCache)
+            {
+                ((RedisCache)cache).Dispose();
+            }
         }
     }
 }

@@ -10,11 +10,23 @@ namespace RedisCacheClient.Tests
     [TestClass]
     public class ExpiryTest
     {
+        private ObjectCache cache;
+
+        [TestInitialize]
+        public void Initialize()
+        {
+            cache = CreateRedisCache();
+        }
+
+        [TestCleanup]
+        public void Cleanup()
+        {
+            DisposeRedisCache(cache);
+        }
+
         [TestMethod]
         public void AbsoluteLiving()
         {
-            var cache = CreateRedisCache();
-
             var key = "absolute";
             var expected = "value";
 
@@ -30,8 +42,6 @@ namespace RedisCacheClient.Tests
         [TestMethod]
         public void AbsoluteExpired()
         {
-            var cache = CreateRedisCache();
-
             var key = "absolute";
             var value = "value";
 
@@ -58,6 +68,14 @@ namespace RedisCacheClient.Tests
             }
 
             return cache;
+        }
+
+        private void DisposeRedisCache(ObjectCache cache)
+        {
+            if (cache is RedisCache)
+            {
+                ((RedisCache)cache).Dispose();
+            }
         }
     }
 }
